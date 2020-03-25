@@ -1,61 +1,87 @@
 class Honeybee {
-    constructor(obj, container) {
+    constructor(obj, container, beehive) {
         this.$object = obj;
         this.$container = container;
-        this.current_position = this._generateNewPosition();
+        this.$hive = beehive;
+        this.position = this._generateNewPosition();
+        this.returnToHive = 0;
+        this.returnInterval = randint(3, 7);
+        this.boundEvent = this._moveOnce.bind(this);
     }
 
     _generateNewPosition() {
-        // Get container dimensions minus div size
-        var availableWidth = this.$container.innerWidth - this.$object.clientWidth;
-        var availableHeight = this.$container.innerHeight - this.$object.clientHeight;
-        // Pick a random place in the space
-        var x = Math.floor(Math.random() * availableWidth);
-        var y = Math.floor(Math.random() * availableHeight);
+        var x, y;
+
+        if(this.returnToHive >= this.returnInterval) {
+            var rect = this.$hive.getBoundingClientRect();
+
+            x = ((rect.left + rect.right) / 2) + randint(-30, 30);
+            y = ((rect.top + rect.bottom) / 2) + randint(-30, 30);
+            this.returnToHive = -1;
+            this.returnInterval = randint(3, 7);
+        }
+        else {
+            var availableWidth = this.$container.innerWidth - this.$object.clientWidth;
+            var availableHeight = this.$container.innerHeight - this.$object.clientHeight;
+
+            x = Math.random() * availableWidth;
+            y = Math.random() * availableHeight;
+            this.returnToHive++;
+        }
+
         return { x: x, y: y };
     }
 
     _calcDelta(a, b) {
         var dx = a.x - b.x;
         var dy = a.y - b.y;
-        var dist = Math.sqrt(dx * dx + dy * dy);
-        return dist;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     _moveOnce(wait=true) {
+        if(this.returnToHive == -1) {
+            this.$object.style.visibility = 'hidden';
+            this.returnToHive++;
+            setTimeout(this.boundEvent, randint(1000, 3000));
+            return;
+        }
+
         setTimeout(function(that) {
-            // Pick a new spot on the page
+            if(that.returnToHive == 0) that.$object.style.visibility = 'visible';
+
             var next = that._generateNewPosition();
-            // How far do we have to move?
-            var delta = that._calcDelta(that.current_position, next);
-            // Speed of this transition, rounded to 2DP
+            var delta = that._calcDelta(that.position, next);
             var speed = Math.round((delta / 250) * 100) / 100;
+
             that.$object.style.transition = 'transform ' + speed + 's ease-in-out';
             that.$object.style.transform = 'translate3d(' + next.x + 'px, ' + next.y + 'px, 0)';
-            // Save this new position ready for the next call.
-            that.current_position = next;
-        }, wait ? Math.random() * 5 * 1000 : 0, this);
+            that.position = next;
+        }, wait ? randint(500, 5000) : 0, this);
     }
 
     start() {
-        // Make sure our object has the right css set
         this.$object.willChange = 'transform';
         this.$object.pointerEvents = 'auto';
-        this.boundEvent = this._moveOnce.bind(this)
-
-        // Bind callback to keep things moving
-        this.$object.addEventListener('transitionend', this.boundEvent);
-
-        // Start it moving
-        this.$object.style.transform = 'translate3d(' + this.current_position.x + 'px, ' + this.current_position.y + 'px, 0)';
+        this.$object.addEventListener('transitionend', this.boundEvent, { passive: true, useCapture: false });
+        this.$object.style.transform = 'translate3d(' + this.position.x + 'px, ' + this.position.y + 'px, 0)';
         this._moveOnce(false);
     }
 }
 
-for(let i = 0; i < Math.floor(Math.random() * (15 - 7 + 1)) + 7; i++) {
-    var b = document.createElement("div");
-    b.setAttribute('class', 'bee position-absolute');
-    b.innerHTML = "🐝";
-    document.body.prepend(b);
-    (new Honeybee(b, window)).start();
+function randint(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+function spawnBees() {
+    var hive = document.getElementById("beehive");
+
+    for(let i = 0; i < randint(9, 21); i++) {
+        var b = document.createElement("div");
+        b.setAttribute('class', 'bee position-absolute');
+        b.innerHTML = "\ud83d\udc1d";
+        document.body.prepend(b);
+        (new Honeybee(b, window, hive)).start();
+    }
+};
+
+window['spawnBees'] = spawnBees;
